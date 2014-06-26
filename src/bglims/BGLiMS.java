@@ -125,7 +125,7 @@ public class BGLiMS {
                 +" "+data.numberOfCovariatesToFixInModel
                 +" "+data.numberOfClusters
                 +" "+data.numberOfCovariatesWithInformativePriors
-                +" "+data.numberOfModelSpacePartitions
+                +" "+data.numberOfUnknownBetaPriors
                 +" "+arguments.recordClusterIntercepts
                 +" "+arguments.numberOfModelSpacePriorPartitions
                 +" "+arguments.numberOfIterations
@@ -154,8 +154,8 @@ public class BGLiMS {
         for (int v=0; v<data.totalNumberOfCovariates; v++) {
             buffer.write(data.covariateNames[v]+" ");
         }
-        if (data.numberOfModelSpacePartitions>0) {
-            for (int c=0; c<data.numberOfModelSpacePartitions; c++) {
+        if (data.numberOfUnknownBetaPriors>0) {
+            for (int c=0; c<data.numberOfUnknownBetaPriors; c++) {
                 buffer.write("LogBetaPriorSd"+(c+1)+" ");   // beta hyper prior sds
             }
         }
@@ -175,6 +175,10 @@ public class BGLiMS {
         ***********************************************************************/
 
         int counter = 0;
+        System.out.println("");
+        System.out.println("--------------------------------");
+        System.out.println("--- Initiating MCMC sampling ---");
+        System.out.println("--------------------------------");
         for(int i=0; i<arguments.numberOfIterations; i++) {
 
             // update
@@ -214,8 +218,11 @@ public class BGLiMS {
 
         // Close buffer that is used to write results
         buffer.close();
-        System.out.println("MCMC completed - results written to "
-                +arguments.pathToResultsFile );
+        System.out.println("------------------------------");
+        System.out.println("--- MCMC sampling complete ---");
+        System.out.println("------------------------------");
+        System.out.println("");        
+        System.out.println("Results written to "+arguments.pathToResultsFile );
 
     }
 
