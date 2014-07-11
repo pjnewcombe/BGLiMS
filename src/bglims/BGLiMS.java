@@ -14,6 +14,7 @@ import Methods.RegressionMethods;
 import Objects.Arguments;
 import Objects.Data;
 import Objects.IterationValues;
+import Objects.LikelihoodTypes;
 import Objects.ParameterTypes;
 import Objects.Priors;
 import Objects.ProposalDistributions;
@@ -110,10 +111,14 @@ public class BGLiMS {
                 +" burnin"
                 +" thin");
         buffer.newLine();   // Model space means (and splits)
-        if (data.survivalAnalysis==1) {
+        if (data.whichLikelihoodType==LikelihoodTypes.WEIBULL.ordinal()) {
             buffer.write("Weibull ");
-        } else if (data.survivalAnalysis==0) {
+        } else if (data.whichLikelihoodType==LikelihoodTypes.LOGISTIC.ordinal()) {
             buffer.write("Logistic ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN.ordinal()) {
+            buffer.write("Gaussian ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL.ordinal()) {
+            buffer.write("GaussianMarg ");
         }
         if (arguments.modelSpacePriorFamily==0) {
             buffer.write("Poisson");
@@ -147,8 +152,11 @@ public class BGLiMS {
             }
         }
         buffer.newLine(); // Variable names
-        if (data.survivalAnalysis==1) {
-            buffer.write("LogWeibullScale ");   // between study var                                
+        if (data.whichLikelihoodType==LikelihoodTypes.WEIBULL.ordinal()) {
+            buffer.write("LogWeibullScale ");   // Weibull k                                
+        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN.ordinal()|
+                data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL.ordinal()) {
+            buffer.write("LogGaussianResidual ");   // Gaussian residual            
         }
         buffer.write("alpha ");
         for (int v=0; v<data.totalNumberOfCovariates; v++) {
@@ -179,6 +187,8 @@ public class BGLiMS {
         System.out.println("--------------------------------");
         System.out.println("--- Initiating MCMC sampling ---");
         System.out.println("--------------------------------");
+        long t1 = 0;
+        long t2 = 0;
         for(int i=0; i<arguments.numberOfIterations; i++) {
 
             // update
@@ -197,6 +207,19 @@ public class BGLiMS {
             
             // Adapting
             if (i<=arguments.adaptionLength) {
+                // Early feedback to get a sense of run time
+                if (i==1) {
+                    System.out.println("1 iteration complete");
+                    t1 = System.currentTimeMillis();
+                }
+                if (i==10) {System.out.println("10 iterations complete");}
+                if (i==100) {System.out.println("100 iterations complete");}
+                if (i==1000) {
+                    System.out.println("1000 iterations complete");
+                    long minsFor1milIts = (System.currentTimeMillis()-t1)/(60);
+                    System.out.println("Estimated minutes for 1 million iterations: "+minsFor1milIts);
+                    System.out.println("------------------------------");
+                }
                 propSdsOb.adapt(data, prop, i);
             }
   
