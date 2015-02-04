@@ -88,7 +88,7 @@ public class BGLiMS {
         ProposalDistributions propSdsOb = new ProposalDistributions(arguments, data);
 
         // Initialise prior distributions
-        Priors priors = new Priors(arguments);
+        Priors priors = new Priors(arguments, data);
 
         // Inititialise current and proposed values objects        
         IterationValues curr = new IterationValues(arguments, data, priors);
