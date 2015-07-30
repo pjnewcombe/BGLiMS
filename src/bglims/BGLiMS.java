@@ -10,6 +10,7 @@
  */
 package bglims;
 
+import Methods.GeneralMethods;
 import Methods.RegressionMethods;
 import Objects.Arguments;
 import Objects.Data;
@@ -90,7 +91,16 @@ public class BGLiMS {
         // Initialise prior distributions
         Priors priors = new Priors(arguments, data);
 
-        // Inititialise current and proposed values objects        
+        // Disable null moves for conjugate modelling without Tau       
+        if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()|
+                data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()) {
+            if (data.modelTau==0) {
+                arguments.probRemove = 0.33;
+                arguments.probAdd = 0.33;
+                arguments.probSwap = 0.34;
+                arguments.probNull = 0;                
+            }
+        }
         IterationValues curr = new IterationValues(arguments, data, priors);
         IterationValues prop = new IterationValues(arguments, data, priors);
 
@@ -105,7 +115,7 @@ public class BGLiMS {
                 +" R"
                 +" varsWithFixedPriors"
                 +" nBetaHyperPriorComp"
-                +" randomInterceptsSaved"
+                +" allModelScoresUpToDim"
                 +" nRjComp"
                 +" iterations"
                 +" burnin"
@@ -117,8 +127,12 @@ public class BGLiMS {
             buffer.write("Logistic ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN.ordinal()) {
             buffer.write("Gaussian ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()) {
+            buffer.write("GaussianConj ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL.ordinal()) {
             buffer.write("GaussianMarg ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()) {
+            buffer.write("GaussianMargConj ");
         }
         if (arguments.modelSpacePriorFamily==0) {
             buffer.write("Poisson");
@@ -128,10 +142,10 @@ public class BGLiMS {
         buffer.write(
                 " "+data.totalNumberOfCovariates
                 +" "+data.numberOfCovariatesToFixInModel
-                +" "+data.numberOfClusters
+                +" "+0 // This was the number of clusters (R)
                 +" "+data.numberOfCovariatesWithInformativePriors
-                +" "+data.numberOfUnknownBetaPriors
-                +" "+arguments.recordClusterIntercepts
+                +" "+data.numberOfHierarchicalCovariatePriorPartitions
+                +" "+data.allModelScoresUpToDim
                 +" "+arguments.numberOfModelSpacePriorPartitions
                 +" "+arguments.numberOfIterations
                 +" "+arguments.burnInLength
@@ -151,6 +165,150 @@ public class BGLiMS {
                 buffer.write(data.modelSpacePartitionIndices[c]+" ");
             }
         }
+        
+        /**********************************************************************
+        *** All single SNP models *********************************************
+        ***********************************************************************/
+        
+        int[] originalModel;
+        if (data.allModelScoresUpToDim >= 1) {
+            originalModel = curr.model;
+            /**
+             * Start with the null model
+             */
+            for (int v=data.numberOfCovariatesToFixInModel; v<data.totalNumberOfCovariates; v++) {
+                curr.model[v]=0;
+            }
+            curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+            curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                    arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+            curr.conjugate_calcLogLike(arguments, data);
+            buffer.newLine();
+            buffer.write("Null "+curr.logLikelihood);
+            /**
+             * Calculate likelihood score for every model
+             */
+            for (int v=data.numberOfCovariatesToFixInModel; v<data.totalNumberOfCovariates; v++) {
+                curr.model[v]=1;
+                curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+                curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                        arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+                curr.conjugate_calcLogLike(arguments, data);
+                buffer.newLine();
+                buffer.write(data.covariateNames[v]+" "+curr.logLikelihood);
+                curr.model[v]=0;
+            }
+            if (data.allModelScoresUpToDim >= 2) {
+                /**
+                 * Calculate likelihood score for every double model
+                 */
+                for (int v1=data.numberOfCovariatesToFixInModel; v1<(data.totalNumberOfCovariates-1); v1++) {
+                    for (int v2=(v1+1); v2<data.totalNumberOfCovariates; v2++) {
+                        curr.model[v1]=1;
+                        curr.model[v2]=1;
+                            curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+                            curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                                    arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+                            curr.conjugate_calcLogLike(arguments, data);
+                            buffer.newLine();
+                            buffer.write(data.covariateNames[v1]+"_AND_"+data.covariateNames[v2]+" "+curr.logLikelihood);
+                        curr.model[v1]=0;
+                        curr.model[v2]=0;
+                    }
+                }                
+            }
+            if (data.allModelScoresUpToDim >= 3) {
+                /**
+                 * Calculate likelihood score for every triple SNP model
+                 */
+                for (int v1=data.numberOfCovariatesToFixInModel; v1<(data.totalNumberOfCovariates-2); v1++) {
+                    for (int v2=(v1+1); v2<(data.totalNumberOfCovariates-1); v2++) {
+                        for (int v3=(v2+1); v3<data.totalNumberOfCovariates; v3++) {
+                            curr.model[v1]=1;
+                            curr.model[v2]=1;
+                            curr.model[v3]=1;
+                                curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+                                curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                                        arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+                                curr.conjugate_calcLogLike(arguments, data);
+                                buffer.newLine();
+                                buffer.write(data.covariateNames[v1]+"_AND_"+data.covariateNames[v2]+"_AND_"+data.covariateNames[v3]+" "+curr.logLikelihood);
+                            curr.model[v1]=0;
+                            curr.model[v2]=0;
+                            curr.model[v3]=0;
+                        }
+                    }
+                }                
+            }
+            if (data.allModelScoresUpToDim >= 4) {
+                /**
+                 * Calculate likelihood score for every quadruple SNP model
+                 */
+                for (int v1=data.numberOfCovariatesToFixInModel; v1<(data.totalNumberOfCovariates-3); v1++) {
+                    for (int v2=(v1+1); v2<(data.totalNumberOfCovariates-2); v2++) {
+                        for (int v3=(v2+1); v3<(data.totalNumberOfCovariates-1); v3++) {
+                            for (int v4=(v3+1); v4<data.totalNumberOfCovariates; v4++) {
+                                curr.model[v1]=1;
+                                curr.model[v2]=1;
+                                curr.model[v3]=1;
+                                curr.model[v4]=1;
+                                    curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+                                    curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                                            arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+                                    curr.conjugate_calcLogLike(arguments, data);
+                                    buffer.newLine();
+                                    buffer.write(data.covariateNames[v1]+"_AND_"+data.covariateNames[v2]+"_AND_"+data.covariateNames[v3]+"_AND_"+data.covariateNames[v4]+" "+curr.logLikelihood);
+                                curr.model[v1]=0;
+                                curr.model[v2]=0;
+                                curr.model[v3]=0;
+                                curr.model[v4]=0;
+                            }
+                        }
+                    }
+                }                
+            }
+            if (data.allModelScoresUpToDim >= 5) {
+                /**
+                 * Calculate likelihood score for every 5 SNP model
+                 */
+                for (int v1=data.numberOfCovariatesToFixInModel; v1<(data.totalNumberOfCovariates-4); v1++) {
+                    for (int v2=(v1+1); v2<(data.totalNumberOfCovariates-3); v2++) {
+                        for (int v3=(v2+1); v3<(data.totalNumberOfCovariates-2); v3++) {
+                            for (int v4=(v3+1); v4<(data.totalNumberOfCovariates-1); v4++) {
+                                for (int v5=(v4+1); v4<data.totalNumberOfCovariates; v5++) {
+                                    curr.model[v1]=1;
+                                    curr.model[v2]=1;
+                                    curr.model[v3]=1;
+                                    curr.model[v4]=1;
+                                    curr.model[v5]=1;
+                                        curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+                                        curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                                                arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+                                        curr.conjugate_calcLogLike(arguments, data);
+                                        buffer.newLine();
+                                        buffer.write(data.covariateNames[v1]+"_AND_"+data.covariateNames[v2]+"_AND_"+data.covariateNames[v3]+"_AND_"+data.covariateNames[v4]+"_AND_"+data.covariateNames[v5]+" "+curr.logLikelihood);
+                                    curr.model[v1]=0;
+                                    curr.model[v2]=0;
+                                    curr.model[v3]=0;
+                                    curr.model[v4]=0;
+                                    curr.model[v5]=0;
+                                }
+                            }
+                        }
+                    }
+                }                
+            }
+            /**
+             * Set curr back to how it was
+             */
+            curr.model=originalModel;
+            curr.modelDimension = GeneralMethods.countPresVars(data.totalNumberOfCovariates, curr.model);
+            curr.modelSpacePartitionDimensions = GeneralMethods.countPresVarsComps(
+                    arguments.numberOfModelSpacePriorPartitions, data.modelSpacePartitionIndices, curr.model);
+            curr.conjugate_calcLogLike(arguments, data);
+        }
+        
+        
         buffer.newLine(); // Variable names
         if (data.whichLikelihoodType==LikelihoodTypes.WEIBULL.ordinal()) {
             buffer.write("LogWeibullScale ");   // Weibull k                                
@@ -162,17 +320,9 @@ public class BGLiMS {
         for (int v=0; v<data.totalNumberOfCovariates; v++) {
             buffer.write(data.covariateNames[v]+" ");
         }
-        if (data.numberOfUnknownBetaPriors>0) {
-            for (int c=0; c<data.numberOfUnknownBetaPriors; c++) {
+        if (data.numberOfHierarchicalCovariatePriorPartitions>0) {
+            for (int c=0; c<data.numberOfHierarchicalCovariatePriorPartitions; c++) {
                 buffer.write("LogBetaPriorSd"+(c+1)+" ");   // beta hyper prior sds
-            }
-        }
-        if (data.numberOfClusters > 0) {
-            buffer.write("LogBetweenClusterSd ");   // between study var
-            if (arguments.recordClusterIntercepts == 1) {
-                for (int r=0; r<data.numberOfClusters; r++) {
-                    buffer.write("R"+(r+1)+" ");
-                }
             }
         }
         buffer.write("LogLikelihood ");   // log-Likelihood
@@ -192,8 +342,14 @@ public class BGLiMS {
         for(int i=0; i<arguments.numberOfIterations; i++) {
 
             // update
-            prop.update(arguments, data, curr, priors, propSdsOb, randomDraws);
-
+            if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()|
+                    data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()
+                    ) {
+                prop.conjugate_update(arguments, data, curr, priors, propSdsOb, randomDraws);                
+            } else {
+                prop.update(arguments, data, curr, priors, propSdsOb, randomDraws);                
+            }
+            
             // Decide whether proposal is proposalAccepted and, if so, update 'current'
             // likelihoodFamily to proposal ADAPTION
             double accDraw = randomDraws.nextFloat();
@@ -221,6 +377,9 @@ public class BGLiMS {
                     System.out.println("------------------------------");
                 }
                 propSdsOb.adapt(data, prop, i);
+                if (i==arguments.adaptionLength) {
+                    System.out.println("Likelihood (usefull for debugging): "+curr.logLikelihood);
+                }
             }
   
             // Write resulting 'current' likelihoodFamily to results file
@@ -234,6 +393,7 @@ public class BGLiMS {
             if (counter==arguments.consoleOutputInterval-1) {
                 System.out.println((i+1)+" / "+arguments.numberOfIterations+" iterations " +
                         "complete");
+//                System.out.println("Likelihood (for debugging) "+curr.logLikelihood);
                 counter = 0;
             } else {counter++;}
 
