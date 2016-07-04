@@ -22,6 +22,7 @@ import Objects.ProposalDistributions;
 import java.io.BufferedWriter;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.util.Locale;
 import java.util.Random;
 import umontreal.iro.lecuyer.rng.F2NL607;
 
@@ -70,6 +71,9 @@ public class BGLiMS {
      */
     public static void main(String[] args) throws IOException {
         
+        Locale.setDefault(Locale.Category.DISPLAY, Locale.ENGLISH);
+        Locale.setDefault(Locale.Category.FORMAT, Locale.ENGLISH); // Necessary so JAM expects dots in the input!
+        
         /*****************************************
          *** READ ARGUMENTS FILE AND DATA FILE ***
          *****************************************/
@@ -93,7 +97,7 @@ public class BGLiMS {
 
         // Disable null moves for conjugate modelling without Tau       
         if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()|
-                data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()) {
+                data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()) {
             if (data.modelTau==0) {
                 arguments.probRemove = 0.33;
                 arguments.probAdd = 0.33;
@@ -115,7 +119,7 @@ public class BGLiMS {
                 +" R"
                 +" varsWithFixedPriors"
                 +" nBetaHyperPriorComp"
-                +" allModelScoresUpToDim"
+                +" enumerateUpToDim"
                 +" nRjComp"
                 +" iterations"
                 +" burnin"
@@ -125,14 +129,24 @@ public class BGLiMS {
             buffer.write("Weibull ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.LOGISTIC.ordinal()) {
             buffer.write("Logistic ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC.ordinal()) {
+            buffer.write("RocAUC ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC_ANCHOR.ordinal()) {
+            buffer.write("RocAUC_Anchoring ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN.ordinal()) {
             buffer.write("Gaussian ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()) {
             buffer.write("GaussianConj ");
-        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL.ordinal()) {
-            buffer.write("GaussianMarg ");
-        } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()) {
-            buffer.write("GaussianMargConj ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.JAM_MCMC.ordinal()) {
+            buffer.write("JAM_MCMC ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()) {
+            buffer.write("JAM ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.COX.ordinal()) {
+            buffer.write("Cox ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.CASECOHORT_BARLOW.ordinal()) {
+            buffer.write("CaseCohort_Barlow ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.CASECOHORT_PRENTICE.ordinal()) {
+            buffer.write("CaseCohort_Prentice ");
         }
         if (arguments.modelSpacePriorFamily==0) {
             buffer.write("Poisson");
@@ -145,7 +159,7 @@ public class BGLiMS {
                 +" "+0 // This was the number of clusters (R)
                 +" "+data.numberOfCovariatesWithInformativePriors
                 +" "+data.numberOfHierarchicalCovariatePriorPartitions
-                +" "+data.allModelScoresUpToDim
+                +" "+data.enumerateUpToDim
                 +" "+arguments.numberOfModelSpacePriorPartitions
                 +" "+arguments.numberOfIterations
                 +" "+arguments.burnInLength
@@ -171,7 +185,7 @@ public class BGLiMS {
         ***********************************************************************/
         
         int[] originalModel;
-        if (data.allModelScoresUpToDim >= 1) {
+        if (data.enumerateUpToDim >= 1) {
             originalModel = curr.model;
             /**
              * Start with the null model
@@ -198,7 +212,7 @@ public class BGLiMS {
                 buffer.write(data.covariateNames[v]+" "+curr.logLikelihood);
                 curr.model[v]=0;
             }
-            if (data.allModelScoresUpToDim >= 2) {
+            if (data.enumerateUpToDim >= 2) {
                 /**
                  * Calculate likelihood score for every double model
                  */
@@ -217,7 +231,7 @@ public class BGLiMS {
                     }
                 }                
             }
-            if (data.allModelScoresUpToDim >= 3) {
+            if (data.enumerateUpToDim >= 3) {
                 /**
                  * Calculate likelihood score for every triple SNP model
                  */
@@ -240,7 +254,7 @@ public class BGLiMS {
                     }
                 }                
             }
-            if (data.allModelScoresUpToDim >= 4) {
+            if (data.enumerateUpToDim >= 4) {
                 /**
                  * Calculate likelihood score for every quadruple SNP model
                  */
@@ -267,7 +281,7 @@ public class BGLiMS {
                     }
                 }                
             }
-            if (data.allModelScoresUpToDim >= 5) {
+            if (data.enumerateUpToDim >= 5) {
                 /**
                  * Calculate likelihood score for every 5 SNP model
                  */
@@ -312,8 +326,13 @@ public class BGLiMS {
         buffer.newLine(); // Variable names
         if (data.whichLikelihoodType==LikelihoodTypes.WEIBULL.ordinal()) {
             buffer.write("LogWeibullScale ");   // Weibull k                                
+        } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC.ordinal()) {
+            buffer.write("DirichletConcentration ");   // Roc AUC                                
+            buffer.write("AUC ");   // Roc AUC                                
+        } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC_ANCHOR.ordinal()) {
+            buffer.write("AUC ");   // Roc AUC                                
         } else if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN.ordinal()|
-                data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL.ordinal()) {
+                data.whichLikelihoodType==LikelihoodTypes.JAM_MCMC.ordinal()) {
             buffer.write("LogGaussianResidual ");   // Gaussian residual            
         }
         buffer.write("alpha ");
@@ -342,7 +361,7 @@ public class BGLiMS {
         for(int i=0; i<arguments.numberOfIterations; i++) {
 
             // update
-            if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_MARGINAL_CONJ.ordinal()|
+            if (data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()|
                     data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()
                     ) {
                 prop.conjugate_update(arguments, data, curr, priors, propSdsOb, randomDraws);                
@@ -368,14 +387,14 @@ public class BGLiMS {
                     System.out.println("1 iteration complete");
                     t1 = System.currentTimeMillis();
                 }
-                if (i==10) {System.out.println("10 iterations complete");}
-                if (i==100) {System.out.println("100 iterations complete");}
-                if (i==1000) {
-                    System.out.println("1000 iterations complete");
-                    long minsFor1milIts = (System.currentTimeMillis()-t1)/(60);
+                if (i==10) {System.out.println("10 iterations complete ("+curr.modelDimension+" variables selected)");}
+                if (i==100) {System.out.println("100 iterations complete ("+curr.modelDimension+" variables selected)");}
+                if (i==1000) {System.out.println("1000 iterations complete ("+curr.modelDimension+" variables selected)");}
+                if (i==10000) {
+                    long minsFor1milIts = (System.currentTimeMillis()-t1)/(600);
                     System.out.println("Estimated minutes for 1 million iterations: "+minsFor1milIts);
                     System.out.println("------------------------------");
-                }
+                }                
                 propSdsOb.adapt(data, prop, i);
                 if (i==arguments.adaptionLength) {
                     System.out.println("Likelihood (usefull for debugging): "+curr.logLikelihood);
@@ -392,7 +411,7 @@ public class BGLiMS {
 
             if (counter==arguments.consoleOutputInterval-1) {
                 System.out.println((i+1)+" / "+arguments.numberOfIterations+" iterations " +
-                        "complete");
+                        "complete ("+curr.modelDimension+" variables selected)");
 //                System.out.println("Likelihood (for debugging) "+curr.logLikelihood);
                 counter = 0;
             } else {counter++;}
