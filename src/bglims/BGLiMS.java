@@ -1,10 +1,6 @@
 /**
- * Package for fitting Bayesian GLMs - currently logistic and Weibull regression
- * models are available. Approximate Posterior samples are drawn using an MCMC 
- * sampler with a (Reversible Jump) Metropolis-Hastings acceptance ratio.
- * 
- * - Allows fitting of random intercepts
- * - Allows likelihoodFamily selection through a Reversible Jump algorithm
+ * Package facilitating Bayesian variable selection under various likelihoods.
+ * See documentation in associated R package R2BGLiMS.
  * 
  * @author Paul J Newcombe
  */
@@ -419,7 +415,6 @@ public class BGLiMS {
             if (counter==arguments.consoleOutputInterval-1) {
                 System.out.println((i+1)+" / "+arguments.numberOfIterations+" iterations " +
                         "complete ("+curr.modelDimension+" variables selected)");
-//                System.out.println("Likelihood (for debugging) "+curr.logLikelihood);
                 counter = 0;
             } else {counter++;}
 
@@ -436,5 +431,3 @@ public class BGLiMS {
     }
 
 }
-
-
