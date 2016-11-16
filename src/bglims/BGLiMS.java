@@ -97,7 +97,9 @@ public class BGLiMS {
 
         // Disable null moves for conjugate modelling without Tau       
         if (data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()|
-                data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()) {
+                data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()|
+                data.whichLikelihoodType==LikelihoodTypes.JAMv2.ordinal()
+                ) {
             if (data.modelTau==0) {
                 arguments.probRemove = 0.33;
                 arguments.probAdd = 0.33;
@@ -129,6 +131,8 @@ public class BGLiMS {
             buffer.write("Weibull ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.LOGISTIC.ordinal()) {
             buffer.write("Logistic ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.CLOGLOG.ordinal()) {
+            buffer.write("CLogLog ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC.ordinal()) {
             buffer.write("RocAUC ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.ROCAUC_ANCHOR.ordinal()) {
@@ -141,6 +145,8 @@ public class BGLiMS {
             buffer.write("JAM_MCMC ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()) {
             buffer.write("JAM ");
+        } else if (data.whichLikelihoodType==LikelihoodTypes.JAMv2.ordinal()) {
+            buffer.write("JAMv2 ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.COX.ordinal()) {
             buffer.write("Cox ");
         } else if (data.whichLikelihoodType==LikelihoodTypes.CASECOHORT_BARLOW.ordinal()) {
@@ -362,6 +368,7 @@ public class BGLiMS {
 
             // update
             if (data.whichLikelihoodType==LikelihoodTypes.JAM.ordinal()|
+                    data.whichLikelihoodType==LikelihoodTypes.JAMv2.ordinal()|
                     data.whichLikelihoodType==LikelihoodTypes.GAUSSIAN_CONJ.ordinal()
                     ) {
                 prop.conjugate_update(arguments, data, curr, priors, propSdsOb, randomDraws);                
